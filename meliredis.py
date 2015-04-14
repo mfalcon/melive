@@ -1,5 +1,5 @@
-#!/home/mf/.virtualenvs/meli/bin/python
 # -*- coding: utf-8 -*-
+#collect meli stats, runs without interruptions
 
 import importlib
 import json
@@ -24,7 +24,7 @@ import meli_api
 INITIAL_OFFSET = 0
 RES_LIMIT = 200
 INITIAL_PAGE_LIMIT = 5
-PAGE_LIMIT = 1 #10 #total pages to scrap
+PAGE_LIMIT = 4 #10 #total pages to scrap
 
 
 ALLOWED_CATEGORIES = {
@@ -71,6 +71,7 @@ class MeliCollector(): #make all into a class
             stats[category_id] = [ALLOWED_CATEGORIES[category_id], sold_quantity]
         
         rd.publish('categories', json.dumps(stats))
+        rd.set('cats_stats', json.dumps(stats)) #FIXME: pretty inneficient
         return stats
         
     
@@ -107,7 +108,8 @@ class MeliCollector(): #make all into a class
             
             rd.set(redis_id, {'prev_sold_quantity':prev_sold,'sold_today':sold_today,'sold_diff':sold_diff})
         
-        self.update_category(item['category_id'], sold_diff)
+        if sold_diff:
+            self.update_category(item['category_id'], sold_diff)
     
     
     def cats_collector(self, queue):
