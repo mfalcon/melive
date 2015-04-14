@@ -23,21 +23,19 @@ import meli_api
 
 INITIAL_OFFSET = 0
 RES_LIMIT = 200
-IDS_LIMIT = 50
+INITIAL_PAGE_LIMIT = 5
 PAGE_LIMIT = 1 #10 #total pages to scrap
-BULK_ITEMS = 300 #get bulk items information to decrease api calls
-WORKERS_NUM = 10
 
 
 ALLOWED_CATEGORIES = {
     'MLA352542': 'iPhone 6 16gb',
     'MLA352543': 'iPhone 6 64gb',
-    'MLA352546': 'iPhone 6 128gb',
+    #'MLA352546': 'iPhone 6 128gb',
     'MLA119876': 'Samsung Galaxy 4',
     'MLA127623': 'Samsung Galaxy 5',
     'MLA351978': 'Moto G',
-    'MLA126252': 'Xperia Z2',
-    'MLA372245': 'Xperia',
+    #'MLA126252': 'Xperia Z2',
+    #'MLA372245': 'Xperia',
 }
 
 
@@ -70,7 +68,8 @@ class MeliCollector(): #make all into a class
         if diff.days == 0:
             return True
         return False
-        
+
+
     def get_stats(self):
         stats = {}
         for category_id in ALLOWED_CATEGORIES:
@@ -79,15 +78,21 @@ class MeliCollector(): #make all into a class
         
         rd.publish('categories', json.dumps(stats))
         return stats
+        
     
     def update_category(self, category_id, item_sold_today):
         redis_id = get_rdid('categories', category_id)
         in_redis = rd.get(redis_id)
         if not in_redis:
             rd.set(redis_id, item_sold_today)   
+            
+            #rd.publish('categories', {'category_id': category_id, 'sold_quantity': item_sold_today})
+
         else:
             sold_acum = int(eval(in_redis)) + item_sold_today
             rd.set(redis_id, sold_acum)
+        
+            #rd.publish('categories', {'category_id': category_id, 'sold_quantity': sold_acum})
         
        
 
@@ -108,6 +113,7 @@ class MeliCollector(): #make all into a class
         else: #item already in redis, add sold_quantity diff
             prev_sold = eval(in_redis)['prev_sold_quantity']
             sold_today = item['sold_quantity'] - prev_sold
+            print "item: %s, sold %s, started with %s" % (redis_id, sold_today, prev_sold)
             rd.set(redis_id, {'prev_sold_quantity':prev_sold,'sold_today':sold_today})
         
         self.update_category(item['category_id'], sold_today)
@@ -129,49 +135,28 @@ class MeliCollector(): #make all into a class
     def get_items(self, cat_id, limit=RES_LIMIT):
         """
         get all the items of a category.
-        The history of an item can be done matching records with the
-        same id.
         """
         offset = 0
-        data = []
-        start_time = timeit.timeit()
-        items_data = self.mapi.search_by_category(cat_id, limit, offset)
-        total_pages = items_data['paging']['total']/items_data['paging']['limit'] #FIXME: RES_LIMIT not paging limit
-        if total_pages > PAGE_LIMIT:
-            total_pages = PAGE_LIMIT
-        total_results = total_pages * limit
-        i = 0
+        total_pages = PAGE_LIMIT
         for pn in range(total_pages):
             print pn
             items_data = self.mapi.search_by_category(cat_id, limit, offset)
             offset += int(limit)
                            
-            items_ids = [item['id'] for item in items_data['results']]
-            total_ids = len(items_ids)
-            total_calls = total_ids / IDS_LIMIT
-            
-            items = []
-            for j in range(total_calls):
-                sub_items = self.mapi.get_items_data(items_ids[IDS_LIMIT*j:IDS_LIMIT*j+IDS_LIMIT])
-                if sub_items:
-                    items += sub_items
-            
-            to_insert_items = items
-            to_insert_hist = []
+            items = items_data['results']        
+            print "items amount: %d" % len(items)
             for item in items:
                 self.insert_item(item, pn)
 
-        return data
     
 
     def collect_categories(self, cat_ids):
             for catid in cat_ids:
                 print catid
                 self.get_items(catid)
-            import pdb; pdb.set_trace()
 
 
-def main(workers=WORKERS_NUM):
+def main(workers):
     jobs = []
     mc = MeliCollector()
 
@@ -192,7 +177,7 @@ def main(workers=WORKERS_NUM):
             
 
     else:
-        mc.collect_categories(['MLA1051'])
+        mc.collect_categories(['MLA126252'])
 
 
 

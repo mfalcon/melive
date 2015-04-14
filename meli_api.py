@@ -87,7 +87,7 @@ class MeliAPI():
 
     def search_by_category(self, cat_id, limit, offset):
         #get the category items
-        url = BASE_SITE_URL + '%s/search?category=%s&limit=%s&offset=%s' % (self.sid, cat_id, limit, offset)
+        url = BASE_SITE_URL + '%s/search?category=%s&limit=%s&offset=%s&condition=new' % (self.sid, cat_id, limit, offset)
         self.logger.info(url)
         data = self.make_call(url)
         return data
