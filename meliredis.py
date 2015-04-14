@@ -63,12 +63,6 @@ class MeliCollector(): #make all into a class
         self.sid = 'MLA'
        
     
-    def started_today(self, item_date):
-        diff = datetime.today() - extract_datetime(item_date)
-        if diff.days == 0:
-            return True
-        return False
-
 
     def get_stats(self):
         stats = {}
@@ -80,16 +74,16 @@ class MeliCollector(): #make all into a class
         return stats
         
     
-    def update_category(self, category_id, item_sold_today):
+    def update_category(self, category_id, item_sold_diff):
         redis_id = get_rdid('categories', category_id)
         in_redis = rd.get(redis_id)
-        if not in_redis:
-            rd.set(redis_id, item_sold_today)   
+        if not in_redis or in_redis == 'null':
+            rd.set(redis_id, item_sold_diff)   
             
             #rd.publish('categories', {'category_id': category_id, 'sold_quantity': item_sold_today})
 
         else:
-            sold_acum = int(eval(in_redis)) + item_sold_today
+            sold_acum = int(eval(in_redis)) + item_sold_diff #FIXME: wrong?
             rd.set(redis_id, sold_acum)
         
             #rd.publish('categories', {'category_id': category_id, 'sold_quantity': sold_acum})
@@ -99,24 +93,21 @@ class MeliCollector(): #make all into a class
     def insert_item(self, item, pn):
         redis_id = get_rdid('items', item['id'])
         in_redis = rd.get(redis_id)
+        sold_today = 0
+        sold_diff = 0
         if not in_redis or in_redis == 'null': #TODO: ??
             #first time considering the item today
-            #check if the item started selling today
-            if self.started_today(item['start_time']):
-                sold_today = item['sold_quantity']
-                rd.set(redis_id, {'prev_sold_quantity': 0, 'sold_today':sold_today}) #TODO: add another fields
-            else:
-                #theres a flaw here, if the item didnt started selling today and its the first time the item appears
-                sold_today = 0
-                rd.set(redis_id, {'prev_sold_quantity':item['sold_quantity'],'sold_today':sold_today})
+            rd.set(redis_id, {'prev_sold_quantity':item['sold_quantity'],'sold_today':sold_today, 'sold_diff':sold_diff})
             
         else: #item already in redis, add sold_quantity diff
-            prev_sold = eval(in_redis)['prev_sold_quantity']
-            sold_today = item['sold_quantity'] - prev_sold
-            print "item: %s, sold %s, started with %s" % (redis_id, sold_today, prev_sold)
-            rd.set(redis_id, {'prev_sold_quantity':prev_sold,'sold_today':sold_today})
+            item_redis = eval(in_redis)
+            prev_sold = item_redis['prev_sold_quantity']
+            sold_diff = item['sold_quantity'] - (item_redis['sold_today'] + prev_sold)
+            sold_today = item['sold_quantity'] - prev_sold #updating sold_today
+            
+            rd.set(redis_id, {'prev_sold_quantity':prev_sold,'sold_today':sold_today,'sold_diff':sold_diff})
         
-        self.update_category(item['category_id'], sold_today)
+        self.update_category(item['category_id'], sold_diff)
     
     
     def cats_collector(self, queue):
