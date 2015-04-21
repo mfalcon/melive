@@ -4,7 +4,6 @@
 import importlib
 import json
 
-from bson import json_util
 import os
 import sys
 import time
@@ -28,14 +27,24 @@ PAGE_LIMIT = 4 #10 #total pages to scrap
 
 
 ALLOWED_CATEGORIES = {
+    #celulares
     'MLA352542': 'iPhone 6 16gb',
     'MLA352543': 'iPhone 6 64gb',
     #'MLA352546': 'iPhone 6 128gb',
+    #'MLA': 'Samsung Galaxy 3',
     'MLA119876': 'Samsung Galaxy 4',
     'MLA127623': 'Samsung Galaxy 5',
     'MLA351978': 'Moto G',
     #'MLA126252': 'Xperia Z2',
     #'MLA372245': 'Xperia',
+    #computacion -> notebooks
+    'MLA13996': 'Apple',
+    'MLA13517': 'Dell',
+    'MLA13517': 'HP',
+    'MLA13513': 'Lenovo',
+    'MLA83596': 'Samsung',
+    'MLA13514': 'Sony Vaio',
+    'MLA13524': 'Toshiba',
 }
 
 
@@ -138,7 +147,9 @@ class MeliCollector(): #make all into a class
                            
             items = items_data['results']        
             print "items amount: %d" % len(items)
+            print items[0]
             for item in items:
+                print item
                 self.insert_item(item, pn)
 
     
@@ -147,6 +158,7 @@ class MeliCollector(): #make all into a class
             for catid in cat_ids:
                 print catid
                 self.get_items(catid)
+                
 
 
 def main(workers):
