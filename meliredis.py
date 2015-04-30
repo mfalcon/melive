@@ -111,8 +111,8 @@ class MeliCollector(): #make all into a class
             
             rd.set(item['id'], {'prev_sold_quantity':prev_sold,'sold_today':sold_today,'sold_diff':sold_diff})
             
-        if sold_diff:
-            self.update_category(cat_id, sold_diff) #this is using the main category_id
+            if sold_diff:
+                self.update_category(cat_id, sold_diff) #this is using the main category_id
         
         
     def cats_collector(self, queue):
@@ -121,7 +121,6 @@ class MeliCollector(): #make all into a class
             catid = queue.get(True)
             print os.getpid(), "got", catid
             print "getting items"
-            rd.set(catid, {'total_sold': 0})
             self.get_items(catid)
             if catid == 'sentinel':
                 print "breaking"
@@ -168,7 +167,12 @@ def main(workers):
             procs = []
             cats = ALLOWED_CATEGORIES.keys() #FIXME: send all cats to get_all_cats
             cats_q = multiprocessing.Queue()
-            [cats_q.put(cat) for cat in cats]
+            
+            for cat in cats:
+                print "setting category: %s" % cat
+                rd.set(cat, {'total_sold': 0})
+                cats_q.put(cat)
+            
             [cats_q.put('sentinel') for i in range(workers)]
             the_pool = multiprocessing.Pool(workers, mc.cats_collector,(cats_q,))
             the_pool.close()
