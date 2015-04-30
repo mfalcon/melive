@@ -23,33 +23,21 @@ import meli_api
 INITIAL_OFFSET = 0
 RES_LIMIT = 200
 INITIAL_PAGE_LIMIT = 5
-PAGE_LIMIT = 4 #10 #total pages to scrap
+PAGE_LIMIT = 5 #10 #total pages to scrap
 
 
-ALLOWED_CATEGORIES = {
-    #celulares
-    'MLA352542': 'iPhone 6 16gb',
-    'MLA352543': 'iPhone 6 64gb',
-    #'MLA352546': 'iPhone 6 128gb',
-    #'MLA': 'Samsung Galaxy 3',
-    #'MLA119876': 'Samsung Galaxy 4',
-    'MLA127623': 'Samsung Galaxy 5',
-    'MLA351978': 'Moto G',
-    #'MLA126252': 'Xperia Z2',
-    #'MLA372245': 'Xperia',
-    #computacion -> notebooks
-    
-    #'MLA13516': 'Acer',
-    #'MLA13996': 'Apple',
-    #'MLA51710': 'Asus',
-    #'MLA32195': 'Bangho',
-    #'MLA13517': 'Dell',
-    #'MLA13517': 'HP',
-    #'MLA13513': 'Lenovo',
-    #'MLA83596': 'Samsung',
-    #'MLA13514': 'Sony Vaio',
-    #'MLA13524': 'Toshiba',
-    
+ALLOWED_CATEGORIES = {   
+    #notebooks
+    'MLA13516': 'Acer',
+    'MLA13996': 'Apple',
+    'MLA51710': 'Asus',
+    'MLA32195': 'Bangho',
+    'MLA13517': 'Dell',
+    'MLA13517': 'HP',
+    'MLA13513': 'Lenovo',
+    'MLA83596': 'Samsung',
+    'MLA13514': 'Sony Vaio',
+    'MLA13524': 'Toshiba',
 }
 
 
@@ -74,35 +62,14 @@ class MeliCollector(): #make all into a class
         self.sid = 'MLA'
 
 
-    def get_category_tree(self, category_id):
-        #returns full category tree
-        cat_data = self.mapi.get_category(category_id)
-        cat_tree = {}
-        cat_data['children_categories']
-        cat_data['path_from_root']
-        import pdb; pdb.set_trace()
-        #for cat in cat_data[]:
-            
-        
-        
-    
-    def get_target(self, category_id):
-        '''
-        get the desired category for the chart 
-        '''
-        if category_id in ALLOWED_CATEGORIES:
-            return category_id
-        else:
-            cat_data = rd.get(category_id)
-            import pdb; pdb.set_trace()
-            cat_tree = cat_data
-        
-
-
     def get_stats(self):
         stats = {}
         for category_id in ALLOWED_CATEGORIES:
-            sold_quantity = int(eval(rd.get(category_id)))
+            cat_data = rd.get(category_id)
+            print category_id
+            print cat_data
+            data = eval(cat_data)
+            sold_quantity = data['total_sold']
             stats[category_id] = [ALLOWED_CATEGORIES[category_id], sold_quantity]
         
         rd.publish('categories', json.dumps(stats))
@@ -111,33 +78,23 @@ class MeliCollector(): #make all into a class
         
     
     def update_category(self, category_id, item_sold_diff):
-        in_redis = rd.get(category_id)
         #if the category is not in the ALLOWED_CATEGORIES dict, then
         #look in its tree to find a suitable one(parent/child)
-        target_cat = self.get_target(category_id)
-        
-        if not in_redis or in_redis == 'null':
-            #TODO: also set the category tree
-            #cat_tree = self.get_category_tree(category_id)
-            print "setting category: %s on redis" % category_id
-            rd.set(category_id, item_sold_diff)   
-            
-            
-
-        else:#F77070
-            sold_acum = int(eval(in_redis)) + item_sold_diff #FIXME: wrong?
-            rd.set(category_id, sold_acum)
-        
-        
+        cat_data = rd.get(category_id)
+        data = eval(cat_data)
+        previously_sold = data['total_sold']
+        data['total_sold'] = previously_sold + item_sold_diff #FIXME: wrong?
+        print "resetting category_id: %s, data: %s" % (category_id, data)
+        rd.set(category_id, data)
        
 
-    def insert_item(self, item, pn):
+    def insert_item(self, item, cat_id, pn):
         in_redis = rd.get(item['id'])
         sold_today = 0
         sold_diff = 0
         if not in_redis or in_redis == 'null': #TODO: ??
             #first time considering the item today
-            rd.set(item['id'], {'prev_sold_quantity':item['sold_quantity'],'sold_today':sold_today, 'sold_diff':sold_diff})
+            rd.set(item['id'], {'prev_sold_quantity': item['sold_quantity'],'sold_today':sold_today, 'sold_diff':sold_diff})
             
         else: #item already in redis, add sold_quantity diff
             item_redis = eval(in_redis)
@@ -146,12 +103,9 @@ class MeliCollector(): #make all into a class
             sold_today = item['sold_quantity'] - prev_sold #updating sold_today
             
             rd.set(item['id'], {'prev_sold_quantity':prev_sold,'sold_today':sold_today,'sold_diff':sold_diff})
-            '''
-            if sold_diff:
-                print "**** updating category ****"
-                self.update_category(item['category_id'], sold_diff)
-            '''
-        self.update_category(item['category_id'], sold_diff) #this is using the item's category_id, which may differ from the desired allowed category
+            
+        if sold_diff:
+            self.update_category(cat_id, sold_diff) #this is using the main category_id
         
         
     def cats_collector(self, queue):
@@ -160,6 +114,7 @@ class MeliCollector(): #make all into a class
             catid = queue.get(True)
             print os.getpid(), "got", catid
             print "getting items"
+            rd.set(catid, {'total_sold': 0})
             self.get_items(catid)
             if catid == 'sentinel':
                 print "breaking"
@@ -180,16 +135,15 @@ class MeliCollector(): #make all into a class
             offset += int(limit)
                            
             items = items_data['results']        
-            print "items amount: %d" % len(items)
             for item in items:
-
-                self.insert_item(item, pn)
+                self.insert_item(item, cat_id, pn) 
 
     
 
     def collect_categories(self, cat_ids):
             for catid in cat_ids:
-                print catid
+                print "setting category: %s" % catid
+                rd.set(catid, {'total_sold': 0})  #setting the category id with 0 sold items
                 self.get_items(catid)
                 
 
@@ -215,7 +169,7 @@ def main(workers):
             
 
     else:
-        mc.collect_categories(['MLA126252'])
+        mc.collect_categories(['MLA13516'])
 
 
 
