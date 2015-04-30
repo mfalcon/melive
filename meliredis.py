@@ -26,7 +26,14 @@ INITIAL_PAGE_LIMIT = 5
 PAGE_LIMIT = 5 #10 #total pages to scrap
 
 
-ALLOWED_CATEGORIES = {   
+ALLOWED_CATEGORIES = { 
+    #celulares
+    'MLA7076': 'LG',
+    'MLA4231': 'Motorola',
+    'MLA3506': 'Nokia',
+    'MLA3519': 'Samsung',
+    'MLA3515': 'Sony',
+    'MLA32089': 'Apple-iPhone',
     #notebooks
     'MLA13516': 'Acer',
     'MLA13996': 'Apple',
@@ -127,16 +134,20 @@ class MeliCollector(): #make all into a class
         get all the items of a category.
         """
         offset = 0
-        total_pages = PAGE_LIMIT
+        items_data = self.mapi.search_by_category(cat_id, limit, offset)
+        total_pages = items_data['paging']['total']/items_data['paging']['limit'] #FIXME: RES_LIMIT not paging limit
+        if total_pages > PAGE_LIMIT:
+            total_pages = PAGE_LIMIT
         #TODO: check if its convenient to set the category here
         for pn in range(total_pages):
             print pn
             items_data = self.mapi.search_by_category(cat_id, limit, offset)
             offset += int(limit)
-                           
             items = items_data['results']        
-            for item in items:
-                self.insert_item(item, cat_id, pn) 
+            print "total items: %d" % len(items)
+            if items:
+                for item in items:
+                    self.insert_item(item, cat_id, pn) 
 
     
 
