@@ -32,19 +32,24 @@ ALLOWED_CATEGORIES = {
     'MLA352543': 'iPhone 6 64gb',
     #'MLA352546': 'iPhone 6 128gb',
     #'MLA': 'Samsung Galaxy 3',
-    'MLA119876': 'Samsung Galaxy 4',
+    #'MLA119876': 'Samsung Galaxy 4',
     'MLA127623': 'Samsung Galaxy 5',
     'MLA351978': 'Moto G',
     #'MLA126252': 'Xperia Z2',
     #'MLA372245': 'Xperia',
     #computacion -> notebooks
-    'MLA13996': 'Apple',
-    'MLA13517': 'Dell',
-    'MLA13517': 'HP',
-    'MLA13513': 'Lenovo',
-    'MLA83596': 'Samsung',
-    'MLA13514': 'Sony Vaio',
-    'MLA13524': 'Toshiba',
+    
+    #'MLA13516': 'Acer',
+    #'MLA13996': 'Apple',
+    #'MLA51710': 'Asus',
+    #'MLA32195': 'Bangho',
+    #'MLA13517': 'Dell',
+    #'MLA13517': 'HP',
+    #'MLA13513': 'Lenovo',
+    #'MLA83596': 'Samsung',
+    #'MLA13514': 'Sony Vaio',
+    #'MLA13524': 'Toshiba',
+    
 }
 
 
@@ -54,14 +59,11 @@ p = rd.pubsub()
 def get_datetime(utc_diff=3): #argentina utc -3 
     return datetime.utcnow() - relativedelta(hours=utc_diff)
 
+
 def extract_datetime(item_date):
     #eg '2015-03-03T23:18:11.000Z'
     #TODO: handle timezones
     return datetime.strptime(item_date, "%Y-%m-%dT%H:%M:%S.%fZ")
-
-
-def get_rdid(item_type, item_id):
-    return item_type + '-' + str(item_id)
 
 
 
@@ -70,13 +72,37 @@ class MeliCollector(): #make all into a class
         api_module = importlib.import_module('meli_api')
         self.mapi = getattr(api_module, 'MeliAPI')()
         self.sid = 'MLA'
-       
+
+
+    def get_category_tree(self, category_id):
+        #returns full category tree
+        cat_data = self.mapi.get_category(category_id)
+        cat_tree = {}
+        cat_data['children_categories']
+        cat_data['path_from_root']
+        import pdb; pdb.set_trace()
+        #for cat in cat_data[]:
+            
+        
+        
     
+    def get_target(self, category_id):
+        '''
+        get the desired category for the chart 
+        '''
+        if category_id in ALLOWED_CATEGORIES:
+            return category_id
+        else:
+            cat_data = rd.get(category_id)
+            import pdb; pdb.set_trace()
+            cat_tree = cat_data
+        
+
 
     def get_stats(self):
         stats = {}
         for category_id in ALLOWED_CATEGORIES:
-            sold_quantity = int(eval(rd.get(get_rdid('categories', category_id))))
+            sold_quantity = int(eval(rd.get(category_id)))
             stats[category_id] = [ALLOWED_CATEGORIES[category_id], sold_quantity]
         
         rd.publish('categories', json.dumps(stats))
@@ -85,29 +111,33 @@ class MeliCollector(): #make all into a class
         
     
     def update_category(self, category_id, item_sold_diff):
-        redis_id = get_rdid('categories', category_id)
-        in_redis = rd.get(redis_id)
-        if not in_redis or in_redis == 'null':
-            rd.set(redis_id, item_sold_diff)   
-            
-            #rd.publish('categories', {'category_id': category_id, 'sold_quantity': item_sold_today})
-
-        else:
-            sold_acum = int(eval(in_redis)) + item_sold_diff #FIXME: wrong?
-            rd.set(redis_id, sold_acum)
+        in_redis = rd.get(category_id)
+        #if the category is not in the ALLOWED_CATEGORIES dict, then
+        #look in its tree to find a suitable one(parent/child)
+        target_cat = self.get_target(category_id)
         
-            #rd.publish('categories', {'category_id': category_id, 'sold_quantity': sold_acum})
+        if not in_redis or in_redis == 'null':
+            #TODO: also set the category tree
+            #cat_tree = self.get_category_tree(category_id)
+            print "setting category: %s on redis" % category_id
+            rd.set(category_id, item_sold_diff)   
+            
+            
+
+        else:#F77070
+            sold_acum = int(eval(in_redis)) + item_sold_diff #FIXME: wrong?
+            rd.set(category_id, sold_acum)
+        
         
        
 
     def insert_item(self, item, pn):
-        redis_id = get_rdid('items', item['id'])
-        in_redis = rd.get(redis_id)
+        in_redis = rd.get(item['id'])
         sold_today = 0
         sold_diff = 0
         if not in_redis or in_redis == 'null': #TODO: ??
             #first time considering the item today
-            rd.set(redis_id, {'prev_sold_quantity':item['sold_quantity'],'sold_today':sold_today, 'sold_diff':sold_diff})
+            rd.set(item['id'], {'prev_sold_quantity':item['sold_quantity'],'sold_today':sold_today, 'sold_diff':sold_diff})
             
         else: #item already in redis, add sold_quantity diff
             item_redis = eval(in_redis)
@@ -115,12 +145,15 @@ class MeliCollector(): #make all into a class
             sold_diff = item['sold_quantity'] - (item_redis['sold_today'] + prev_sold)
             sold_today = item['sold_quantity'] - prev_sold #updating sold_today
             
-            rd.set(redis_id, {'prev_sold_quantity':prev_sold,'sold_today':sold_today,'sold_diff':sold_diff})
+            rd.set(item['id'], {'prev_sold_quantity':prev_sold,'sold_today':sold_today,'sold_diff':sold_diff})
+            '''
+            if sold_diff:
+                print "**** updating category ****"
+                self.update_category(item['category_id'], sold_diff)
+            '''
+        self.update_category(item['category_id'], sold_diff) #this is using the item's category_id, which may differ from the desired allowed category
         
-        if sold_diff:
-            self.update_category(item['category_id'], sold_diff)
-    
-    
+        
     def cats_collector(self, queue):
         print os.getpid(),"working"
         while True:
@@ -131,8 +164,8 @@ class MeliCollector(): #make all into a class
             if catid == 'sentinel':
                 print "breaking"
                 break
-            
-            
+
+
 
     def get_items(self, cat_id, limit=RES_LIMIT):
         """
@@ -140,6 +173,7 @@ class MeliCollector(): #make all into a class
         """
         offset = 0
         total_pages = PAGE_LIMIT
+        #TODO: check if its convenient to set the category here
         for pn in range(total_pages):
             print pn
             items_data = self.mapi.search_by_category(cat_id, limit, offset)
@@ -147,9 +181,8 @@ class MeliCollector(): #make all into a class
                            
             items = items_data['results']        
             print "items amount: %d" % len(items)
-            print items[0]
             for item in items:
-                print item
+
                 self.insert_item(item, pn)
 
     
