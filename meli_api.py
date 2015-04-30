@@ -7,7 +7,7 @@ import requests
 
 BASE_URL = 'https://api.mercadolibre.com/'
 BASE_SITE_URL = BASE_URL + 'sites/'
-SLEEP_TIME = 0.1 #in seconds
+SLEEP_TIME = 0.05 #in seconds
 ERROR_SLEEP_TIME = 0.1
 
 

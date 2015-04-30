@@ -24,6 +24,7 @@ INITIAL_OFFSET = 0
 RES_LIMIT = 200
 INITIAL_PAGE_LIMIT = 5
 PAGE_LIMIT = 5 #10 #total pages to scrap
+ITEMS_IDS_LIMIT = 50 #bulk items get limit
 
 
 ALLOWED_CATEGORIES = { 
@@ -45,6 +46,14 @@ ALLOWED_CATEGORIES = {
     'MLA83596': 'Samsung',
     'MLA13514': 'Sony Vaio',
     'MLA13524': 'Toshiba',
+    #computacion
+    'MLA2141': 'Impresoras',
+    'MLA1712': 'Perifericos',
+    'MLA1649': 'PC',
+    'MLA1652': 'Notebooks',
+    #otros
+    'MLA1430': 'Ropa y accesorios',
+    
 }
 
 
@@ -106,6 +115,7 @@ class MeliCollector(): #make all into a class
         else: #item already in redis, add sold_quantity diff
             item_redis = eval(in_redis)
             prev_sold = item_redis['prev_sold_quantity']
+            #FIXME: sometimes I get an -1 value
             sold_diff = item['sold_quantity'] - (item_redis['sold_today'] + prev_sold)
             sold_today = item['sold_quantity'] - prev_sold #updating sold_today
             
@@ -134,7 +144,9 @@ class MeliCollector(): #make all into a class
         """
         offset = 0
         items_data = self.mapi.search_by_category(cat_id, limit, offset)
-        total_pages = items_data['paging']['total']/items_data['paging']['limit'] #FIXME: RES_LIMIT not paging limit
+        total_items = items_data['paging']['total']
+        print "total items: %s" % total_items
+        total_pages = total_items/items_data['paging']['limit'] #FIXME: RES_LIMIT not paging limit
         if total_pages > PAGE_LIMIT:
             total_pages = PAGE_LIMIT
         #TODO: check if its convenient to set the category here
@@ -143,7 +155,7 @@ class MeliCollector(): #make all into a class
             items_data = self.mapi.search_by_category(cat_id, limit, offset)
             offset += int(limit)
             items = items_data['results']        
-            print "total items: %d" % len(items)
+            print "total items in the result: %d" % len(items)
             if items:
                 for item in items:
                     self.insert_item(item, cat_id, pn) 
