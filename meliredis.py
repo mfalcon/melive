@@ -163,16 +163,15 @@ def main(workers):
     mc = MeliCollector()
 
     if workers != 1:
+        cats = ALLOWED_CATEGORIES.keys()
+        for cat_id in cats:
+            print "setting category: %s" % cat_id
+            rd.set(cat_id, {'total_sold': 0})
+            
         while True:
             procs = []
-            cats = ALLOWED_CATEGORIES.keys() #FIXME: send all cats to get_all_cats
             cats_q = multiprocessing.Queue()
-            
-            for cat in cats:
-                print "setting category: %s" % cat
-                rd.set(cat, {'total_sold': 0})
-                cats_q.put(cat)
-            
+            [cats_q.put(cat) for cat in cats]
             [cats_q.put('sentinel') for i in range(workers)]
             the_pool = multiprocessing.Pool(workers, mc.cats_collector,(cats_q,))
             the_pool.close()
