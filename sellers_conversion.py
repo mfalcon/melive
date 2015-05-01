@@ -32,7 +32,7 @@ SELLERS = {
 }
 
 
-rd = redis.StrictRedis(host='localhost', port=6379, db=1)
+rd = redis.StrictRedis(host='localhost', port=6379, db=2)
 p = rd.pubsub()
 
 def get_datetime(utc_diff=3): #argentina utc -3 
@@ -56,30 +56,31 @@ class MeliCollector(): #make all into a class
         self.items = []
 
 
-    def get_stats(self):
+    def publish_stats(self):
         stats = {}
         for item_id, item_title in self.items:
             item_data = rd.get(item_id)
             data = eval(item_data)
             sold_quantity = data['sold_quantity']
             today_visits = data['today_visits']
-            stats[item_id] = [item_title, sold_quantity, today_visits]
-            import pdb; pdb.set_trace()
+            conversion_rate = today_visits/sold_quantity
+            stats[item_id] = [item_title, sold_quantity, today_visits, conversion_rate]
+            
         
         rd.publish('sales', json.dumps(stats))
-        rd.publish('visits', json.dumps(stats))
+        #rd.publish('visits', json.dumps(stats))
         return stats
        
 
     def insert_item(self, item, seller_id):
-        in_redis = rd.get(item['id'])
         sold_today = 0
         sold_diff = 0
-        if not in_redis or in_redis == 'null': #TODO: ??
+        
+        in_redis = rd.get(item['id'])
+        if not in_redis: # or in_redis == 'null': #TODO: ??
             #first time considering the item today
-            last_time = date_format(datetime.now())
             prev_sold = item['sold_quantity']
-            self.items.append((item['id'],item['title']))
+            self.items.append((item['id'], item['title']))
             
         else: #item already in redis, add sold_quantity diff
             item_redis = eval(in_redis)
@@ -122,9 +123,8 @@ class MeliCollector(): #make all into a class
         items_data = self.mapi.search_by_seller(seller_id, limit, offset)
         total_items = items_data['paging']['total']
         print "total items: %s" % total_items
-        total_pages = total_items/items_data['paging']['limit'] #FIXME: RES_LIMIT not paging limit
+        total_pages = total_items/items_data['paging']['limit'] + 1 #FIXME: RES_LIMIT not paging limit
         print "total pages: %s" % total_pages
-
         for pn in range(total_pages):
             print pn
             items_data = self.mapi.search_by_seller(seller_id, limit, offset)
@@ -140,6 +140,9 @@ class MeliCollector(): #make all into a class
     def collect_sellers(self, sellers_id):
             for seller_id in sellers_id:
                 self.get_items(seller_id)
+            print "publishing stats"
+            stats = self.publish_stats()
+            print stats
                 
 
 
@@ -168,7 +171,7 @@ def main(workers):
             
 
     else:
-        mc.collect_sellers(['MLA13516'])
+        mc.collect_sellers(['134137537'])
 
 
 
