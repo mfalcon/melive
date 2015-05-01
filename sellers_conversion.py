@@ -51,20 +51,23 @@ class MeliCollector(): #make all into a class
         api_module = importlib.import_module('meli_api')
         self.mapi = getattr(api_module, 'MeliAPI')()
         self.sid = 'MLA'
+        today = datetime.today()
+        self.today = datetime.isoformat(datetime(today.year,today.month,today.day))
+        self.items = []
 
 
     def get_stats(self):
         stats = {}
-        for category_id in ALLOWED_CATEGORIES:
-            cat_data = rd.get(category_id)
-            print category_id
-            print cat_data
-            data = eval(cat_data)
-            sold_quantity = data['total_sold']
-            stats[category_id] = [ALLOWED_CATEGORIES[category_id], sold_quantity]
+        for item_id, item_title in self.items:
+            item_data = rd.get(item_id)
+            data = eval(item_data)
+            sold_quantity = data['sold_quantity']
+            today_visits = data['today_visits']
+            stats[item_id] = [item_title, sold_quantity, today_visits]
+            import pdb; pdb.set_trace()
         
-        rd.publish('categories', json.dumps(stats))
-        rd.set('cats_stats', json.dumps(stats)) #FIXME: pretty inneficient
+        rd.publish('sales', json.dumps(stats))
+        rd.publish('visits', json.dumps(stats))
         return stats
        
 
@@ -74,7 +77,9 @@ class MeliCollector(): #make all into a class
         sold_diff = 0
         if not in_redis or in_redis == 'null': #TODO: ??
             #first time considering the item today
-            rd.set(item['id'], {'prev_sold_quantity': item['sold_quantity'],'sold_today':sold_today, 'sold_diff':sold_diff})
+            last_time = date_format(datetime.now())
+            prev_sold = item['sold_quantity']
+            self.items.append((item['id'],item['title']))
             
         else: #item already in redis, add sold_quantity diff
             item_redis = eval(in_redis)
@@ -82,8 +87,18 @@ class MeliCollector(): #make all into a class
             #FIXME: sometimes I get an -1 value
             sold_diff = item['sold_quantity'] - (item_redis['sold_today'] + prev_sold)
             sold_today = item['sold_quantity'] - prev_sold #updating sold_today
-            
-            rd.set(item['id'], {'prev_sold_quantity':prev_sold,'sold_today':sold_today,'sold_diff':sold_diff})
+
+        
+        #meli datetime example: 2015-04-30T20:00:00.000-03:00
+        today_visits = self.mapi.get_items_visits([item['id']], self.today, datetime.isoformat(datetime.now()))
+                    
+        item_data = {
+                'prev_sold_quantity': prev_sold,
+                'sold_today': sold_today,
+                'sold_diff': sold_diff,
+                'today_visits': today_visits,
+        }
+        rd.set(item['id'], item_data)
         
         
     def cats_collector(self, queue):
@@ -116,6 +131,7 @@ class MeliCollector(): #make all into a class
             offset += int(limit)
             items = items_data['results']        
             if items:
+                #separate into chunks and make a call to self.mapi.get_items_visits(ids_list, date_from, date_to)
                 for item in items:
                     self.insert_item(item, seller_id) 
 

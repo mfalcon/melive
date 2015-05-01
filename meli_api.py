@@ -3,6 +3,7 @@ import json
 import logging
 import time
 
+
 import requests
 
 BASE_URL = 'https://api.mercadolibre.com/'
@@ -114,3 +115,12 @@ class MeliAPI():
         url = BASE_URL + 'categories/%s' % cat_id
         data = self.make_call(url)
         return data
+
+
+if __name__ == '__main__':
+    mc = MeliAPI()
+    from datetime import datetime, date
+    hoy = datetime.isoformat(datetime(2015,5,1))
+    ahora = datetime.isoformat(datetime.now())
+    item_id = 'MLA549406738'
+    import pdb; pdb.set_trace()
