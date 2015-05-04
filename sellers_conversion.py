@@ -62,7 +62,7 @@ class MeliCollector(): #make all into a class
         #in_redis = rd.get(item['id'])
         in_redis = rd.hmget('sellers-%s' % seller_id, item['id'])
         
-        if not in_redis: # or in_redis == 'null': #TODO: ??
+        if not in_redis[0]: #in_redis returns [None] ??
             #first time considering the item today
             prev_sold = item['sold_quantity']
             
@@ -76,20 +76,21 @@ class MeliCollector(): #make all into a class
         
         #meli datetime example: 2015-04-30T20:00:00.000-03:00
         today_visits = self.mapi.get_items_visits([item['id']], self.today, time_point)
-                    
+
         item_data = {
                 'prev_sold_quantity': prev_sold,
                 'sold_today': sold_today,
                 'sold_diff': sold_diff,
-                'today_visits': today_visits,
-                'conversion-rate': today_visits/sold_today,
+                'today_visits': today_visits['total_visits'],
+                'conversion-rate': float(today_visits/sold_today) if sold_today else 0.0,
                 'title': item['title']
         }
         
         #rd.set(item['id'], item_data)
         rd.hmset('sellers-%s' % seller_id, {'items-%s' % item['id']: item_data})
-        rd.publish('sellers-%s' % seller_id)
-        
+        rd.publish('sellers', 'sellers-%s' % seller_id)
+
+
     def sellers_collector(self, queue):
         print os.getpid(),"working"
         while True:
@@ -101,7 +102,6 @@ class MeliCollector(): #make all into a class
             if catid == 'sentinel':
                 print "breaking"
                 break
-
 
 
     def get_items(self, seller_id, time_point, limit=RES_LIMIT):
@@ -123,19 +123,13 @@ class MeliCollector(): #make all into a class
                 #separate into chunks and make a call to self.mapi.get_items_visits(ids_list, date_from, date_to)
                 for item in items:
                     self.insert_item(item, seller_id, time_point) 
-        
-        
 
-    
 
     def collect_sellers(self, sellers_id):
             for seller_id in sellers_id:
-                self.get_items(seller_id)
-                stats = self.publish_stats()
-                print "publishing stats of seller %s" % seller_id
-                print stats
+                time_point = datetime.isoformat(datetime.now()) #uniform datetime
+                self.get_items(seller_id, time_point)
                 
-
 
 def main(workers):
     jobs = []
@@ -149,16 +143,12 @@ def main(workers):
             
         while True:
             procs = []
-            cats_q = multiprocessing.Queue()
-            [cats_q.put(cat) for cat in cats]
-            [cats_q.put('sentinel') for i in range(workers)]
-            the_pool = multiprocessing.Pool(workers, mc.sellers_collector,(cats_q,))
+            sellers_q = multiprocessing.Queue()
+            [sellers_q.put(cat) for cat in cats]
+            [sellers_q.put('sentinel') for i in range(workers)]
+            the_pool = multiprocessing.Pool(workers, mc.sellers_collector,(sellers_q,))
             the_pool.close()
             the_pool.join()
-
-            print "batch finished"
-            stats = mc.get_stats()
-            print stats
             
 
     else:
