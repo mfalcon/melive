@@ -88,7 +88,6 @@ class MeliCollector(): #make all into a class
         
         #rd.set(item['id'], item_data)
         rd.hmset('sellers-%s' % seller_id, {'items-%s' % item['id']: item_data})
-        rd.publish('sellers', 'sellers-%s' % seller_id)
 
 
     def sellers_collector(self, queue):
@@ -99,6 +98,7 @@ class MeliCollector(): #make all into a class
             print "getting items"
             time_point = datetime.isoformat(datetime.now()) #uniform datetime
             self.get_items(seller_id, time_point)
+            rd.publish('sellers', 'sellers-%s' % seller_id)
             if catid == 'sentinel':
                 print "breaking"
                 break
@@ -129,6 +129,7 @@ class MeliCollector(): #make all into a class
             for seller_id in sellers_id:
                 time_point = datetime.isoformat(datetime.now()) #uniform datetime
                 self.get_items(seller_id, time_point)
+                rd.publish('sellers', 'sellers-%s' % seller_id)
                 
 
 def main(workers):
