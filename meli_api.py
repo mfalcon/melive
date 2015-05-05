@@ -72,7 +72,6 @@ class MeliAPI():
     def get_items_visits(self, ids_list, date_from, date_to): #bulk results
         #https://api.mercadolibre.com/items/{Items_id}/visits?date_from=2014-06-01T00:00:00.000-00:00&date_to=2014-06-10T00:00:00.000-00:00'
         url = BASE_URL + 'items/%s/visits?&date_from=%s&date_to=%s' % (",".join(ids_list), date_from, date_to)
-        print url
         self.logger.info(url)
         data = self.make_call(url)
         return data

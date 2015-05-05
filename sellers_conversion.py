@@ -79,7 +79,8 @@ class MeliCollector(): #make all into a class
                 'conversion-rate': float(today_visits/sold_today) if sold_today else 0.0,
                 'title': item['title']
         }
-        
+        if sold_today:
+            print "item %s sold %s units at a conversion rate of %s" % (sold_today, float(today_visits/sold_today) if sold_today else 0.0)
         #rd.set(item['id'], item_data)
         rd.hmset('sellers-%s' % seller_id, {'items-%s' % item['id']: item_data})
 
