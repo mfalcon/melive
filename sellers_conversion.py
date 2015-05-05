@@ -29,6 +29,7 @@ ITEMS_IDS_LIMIT = 50 #bulk items get limit
 
 SELLERS = {
     '134137537': 'TEKNOKINGS',
+    '92607234': 'DATA TOTAL',
 }
 
 
@@ -53,7 +54,18 @@ class MeliCollector(): #make all into a class
         self.sid = 'MLA'
         today = datetime.today()
         self.today = datetime.isoformat(datetime(today.year,today.month,today.day))
-      
+
+    
+    def format_data(self, seller_id):
+        data = []
+        items =  rd.hgetall('sellers-%s' % seller_id)
+        for item_id in items.keys():
+            item_data = eval(items[item_id])
+            data.append(item_data)
+        
+        return json.dumps({'seller': SELLERS[seller_id], 'items': data})
+        
+
 
     def insert_item(self, item, seller_id, time_point):
         #in_redis = rd.get(item['id'])
@@ -124,7 +136,7 @@ class MeliCollector(): #make all into a class
                 for seller_id in sellers_id:
                     time_point = datetime.isoformat(datetime.now()) #uniform datetime
                     self.get_items(seller_id, time_point)
-                    rd.publish('sellers', 'sellers-%s' % seller_id)
+                    rd.publish('sellers', self.format_data(seller_id))
                 
 
 def main(workers):
@@ -148,7 +160,7 @@ def main(workers):
             
 
     else:
-        mc.collect_sellers(['92607234'])
+        mc.collect_sellers(['134137537'])
 
 
 

@@ -54,14 +54,17 @@
         var socket = io();
 
         socket.on('sellers', function(msg){
-          var sellers = $.parseJSON(msg);
-          var data = [];
-          for(key in sellers) {
-            if(sellers.hasOwnProperty(key)) {
-                var seller_name = sellers[key][0];
-                var value = sellers[key][1];
-                data.push(sellers[key]);
-            }
+          var seller = $.parseJSON(msg);
+          var sales = [];
+          var visits = [];
+          var conversion = [];
+          var items = seller['items'];
+          for(item in items) {
+            var item_data = items[item];
+            var item_name = item_data['title'];
+            var value =item_data['today_visits'];
+            //data.push(item_data)
+            data.push(sellers[key]);
           }
           $(".chart").html("");
           drawBar(data);
