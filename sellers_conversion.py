@@ -56,23 +56,18 @@ class MeliCollector(): #make all into a class
       
 
     def insert_item(self, item, seller_id, time_point):
-        sold_today = 0
-        sold_diff = 0
-        
         #in_redis = rd.get(item['id'])
         in_redis = rd.hmget('sellers-%s' % seller_id, item['id'])
         
         if not in_redis[0]: #in_redis returns [None] ??
             #first time considering the item today
             prev_sold = item['sold_quantity']
+            sold_today = 0
             
         else: #item already in redis, add sold_quantity diff
             item_redis = json.loads(in_redis)
             prev_sold = item_redis['prev_sold_quantity']
-            #FIXME: sometimes I get an -1 value
-            sold_diff = item['sold_quantity'] - (item_redis['sold_today'] + prev_sold)
             sold_today = item['sold_quantity'] - prev_sold #updating sold_today
-
         
         #meli datetime example: 2015-04-30T20:00:00.000-03:00
         today_visits = self.mapi.get_items_visits([item['id']], self.today, time_point)
@@ -80,7 +75,6 @@ class MeliCollector(): #make all into a class
         item_data = {
                 'prev_sold_quantity': prev_sold,
                 'sold_today': sold_today,
-                'sold_diff': sold_diff,
                 'today_visits': today_visits['total_visits'],
                 'conversion-rate': float(today_visits/sold_today) if sold_today else 0.0,
                 'title': item['title']
@@ -126,10 +120,11 @@ class MeliCollector(): #make all into a class
 
 
     def collect_sellers(self, sellers_id):
-            for seller_id in sellers_id:
-                time_point = datetime.isoformat(datetime.now()) #uniform datetime
-                self.get_items(seller_id, time_point)
-                rd.publish('sellers', 'sellers-%s' % seller_id)
+            while True:
+                for seller_id in sellers_id:
+                    time_point = datetime.isoformat(datetime.now()) #uniform datetime
+                    self.get_items(seller_id, time_point)
+                    rd.publish('sellers', 'sellers-%s' % seller_id)
                 
 
 def main(workers):
@@ -153,7 +148,7 @@ def main(workers):
             
 
     else:
-        mc.collect_sellers(['134137537'])
+        mc.collect_sellers(['92607234'])
 
 
 
