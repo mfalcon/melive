@@ -14,8 +14,16 @@ redisSubscriber.on('message', function(channel, message) {
   io.emit(channel, message);
 });
 
+
 app.get('/', function(req, res){
   res.sendfile('sellers_d3js.html');
+});
+
+
+app.get('/sellers/:seller_id', function(req, res){
+  var seller = req.param('seller_id');
+  console.log(seller);
+  res.render( 'sellers_d3js.html', { seller:seller } );
 });
 
 io.on('connection', function(socket){
