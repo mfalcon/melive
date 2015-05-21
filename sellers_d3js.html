@@ -15,16 +15,16 @@
   </head>
   <body>
     <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
-    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
     <div>
         <h2>meLive</h2>
         <h3>Sellers Conversion Rates</h3>
     </div>
     <div class="chart">
+    <div id="items">
     </div>
+    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
     <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
-    <script>
-        
+    <script>     
             
         function drawBar(data){
             
@@ -53,21 +53,26 @@
         };
         var socket = io();
 
+        //var data = [];
         socket.on('sellers', function(msg){
           var seller = $.parseJSON(msg);
           var sales = [];
           var visits = [];
           var conversion = [];
           var items = seller['items'];
+          
+          var data = [];
           for(item in items) {
             var item_data = items[item];
-            var item_name = item_data['title'];
-            var value =item_data['today_visits'];
             //data.push(item_data)
-            data.push(sellers[key]);
+            data.push([item_data['title'], item_data['today_visits'], item_data['sold_today'], item_data['conversion-rate']]);
           }
+          
+          //oTable.dataTable(data);
+          
           $(".chart").html("");
           drawBar(data);
+          
         });
     </script>
     

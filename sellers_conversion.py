@@ -30,6 +30,8 @@ ITEMS_IDS_LIMIT = 50 #bulk items get limit
 SELLERS = {
     '134137537': 'TEKNOKINGS',
     '92607234': 'DATA TOTAL',
+    '5846919' : 'COMPUDATASOFT',
+    '80183917' : 'GEZATEK COMPUTACION',
 }
 
 
@@ -105,7 +107,7 @@ class MeliCollector(): #make all into a class
             time_point = datetime.isoformat(datetime.now()) #uniform datetime
             self.get_items(seller_id, time_point)
             rd.publish('sellers', rd.hgetall('sellers-%s' % seller_id))
-            if catid == 'sentinel':
+            if seller_id == 'sentinel':
                 print "breaking"
                 break
 
@@ -120,14 +122,16 @@ class MeliCollector(): #make all into a class
         print "total items: %s" % total_items
         total_pages = total_items/items_data['paging']['limit'] + 1 #FIXME: RES_LIMIT not paging limit
         print "total pages: %s" % total_pages
-        for pn in range(total_pages):
+        #for pn in range(total_pages):
+        for pn in [0]:
             print pn
             items_data = self.mapi.search_by_seller(seller_id, limit, offset)
             offset += int(limit)
-            items = items_data['results']        
+            items = items_data['results'][:10]        
             if items:
                 #separate into chunks and make a call to self.mapi.get_items_visits(ids_list, date_from, date_to)
                 for item in items:
+                    print item['title']
                     self.insert_item(item, seller_id, time_point) 
 
 
@@ -152,7 +156,7 @@ def main(workers):
         while True:
             procs = []
             sellers_q = multiprocessing.Queue()
-            [sellers_q.put(cat) for cat in cats]
+            [sellers_q.put(seller) for seller in sellers]
             [sellers_q.put('sentinel') for i in range(workers)]
             the_pool = multiprocessing.Pool(workers, mc.sellers_collector,(sellers_q,))
             the_pool.close()
@@ -160,7 +164,7 @@ def main(workers):
             
 
     else:
-        mc.collect_sellers(['134137537'])
+        mc.collect_sellers(['80183917'])
 
 
 
