@@ -24,7 +24,7 @@ INITIAL_OFFSET = 0
 RES_LIMIT = 200
 INITIAL_PAGE_LIMIT = 5
 PAGE_LIMIT = 5 #10 #total pages to scrap
-ITEMS_IDS_LIMIT = 50 #bulk items get limit
+ITEMS_IDS_LIMIT = 50 #bulk items/visits get limit
 
 
 SELLERS = {
@@ -37,6 +37,14 @@ SELLERS = {
 
 rd = redis.StrictRedis(host='localhost', port=6379, db=2)
 p = rd.pubsub()
+
+
+def chunks(l, n):
+    """ Yield successive n-sized chunks from l.
+    """
+    for i in xrange(0, len(l), n):
+        yield l[i:i+n]
+
 
 def get_datetime(utc_diff=3): #argentina utc -3 
     return datetime.utcnow() - relativedelta(hours=utc_diff)
@@ -69,7 +77,7 @@ class MeliCollector(): #make all into a class
         
 
 
-    def insert_item(self, item, seller_id, time_point):
+    def insert_item(self, item, seller_id, today_visits):
         #in_redis = rd.get(item['id'])
         in_redis = rd.hmget('sellers-%s' % seller_id, item['id'])
         
@@ -84,12 +92,12 @@ class MeliCollector(): #make all into a class
             sold_today = item['sold_quantity'] - prev_sold #updating sold_today
         
         #meli datetime example: 2015-04-30T20:00:00.000-03:00
-        today_visits = self.mapi.get_items_visits([item['id']], self.today, time_point)
+        #today_visits = self.mapi.get_items_visits([item['id']], self.today, time_point)
 
         item_data = {
                 'prev_sold_quantity': prev_sold,
                 'sold_today': sold_today,
-                'today_visits': today_visits['total_visits'],
+                'today_visits': today_visits,
                 'conversion-rate': float(today_visits/sold_today) if sold_today else 0.0,
                 'title': item['title']
         }
@@ -101,46 +109,67 @@ class MeliCollector(): #make all into a class
     def sellers_collector(self, queue):
         print os.getpid(),"working"
         while True:
-            seller_id = queue.get(True)
-            print os.getpid(), "got", seller_id
-            print "getting items"
-            time_point = datetime.isoformat(datetime.now()) #uniform datetime
-            self.get_items(seller_id, time_point)
-            rd.publish('sellers', rd.hgetall('sellers-%s' % seller_id))
-            if seller_id == 'sentinel':
+            seller_page = queue.get(True)
+            #print os.getpid(), "got seller: %s" % seller_page['seller_id']
+            if seller_page == 'sentinel':
                 print "breaking"
                 break
+            
+            print "getting items"
+            time_point = datetime.isoformat(datetime.now()) #uniform datetime
+            self.get_items(seller_page, time_point)
+            rd.publish('sellers', rd.hgetall('sellers-%s' % seller_page['seller_id']))
+            
 
 
-    def get_items(self, seller_id, time_point, limit=RES_LIMIT):
+    def get_items(self, seller_page, time_point):
         """
-        get all the items of a seller.
+        get all the items of a seller in the desired page.
         """
-        offset = 0
-        items_data = self.mapi.search_by_seller(seller_id, limit, offset)
-        total_items = items_data['paging']['total']
-        print "total items: %s" % total_items
-        total_pages = total_items/items_data['paging']['limit'] + 1 #FIXME: RES_LIMIT not paging limit
-        print "total pages: %s" % total_pages
-        #for pn in range(total_pages):
-        for pn in [0]:
-            print pn
+        print "seller page *******"
+        print seller_page
+        items_data = self.mapi.search_by_seller(seller_page['seller_id'], seller_page['limit'], seller_page['offset'])
+        items = items_data['results']       
+        if items:
+            #separate into chunks and make a call to self.mapi.get_items_visits(ids_list, date_from, date_to)
+            item_ids = [item['id'] for item in items]
+            item_chunks = chunks(item_ids, ITEMS_IDS_LIMIT)
+            items_visits = {}
+            for item_ids in item_chunks:
+                visits = self.mapi.get_items_visits(item_ids, self.today, time_point)
+                for item_visits in visits:
+                    items_visits[item_visits['item_id']] = item_visits['total_visits']
+                
+            for item in items:
+                print item['title']
+                today_visits = items_visits[item['id']]
+                self.insert_item(item, seller_page['seller_id'], today_visits) 
+
+    
+    def get_pages(self, seller_ids, limit=RES_LIMIT):
+        '''receives a seller_id and returns a list of page items
+        to queue'''
+        pages = []
+        for seller_id in seller_ids:
+            offset = 0
             items_data = self.mapi.search_by_seller(seller_id, limit, offset)
-            offset += int(limit)
-            items = items_data['results'][:10]        
-            if items:
-                #separate into chunks and make a call to self.mapi.get_items_visits(ids_list, date_from, date_to)
-                for item in items:
-                    print item['title']
-                    self.insert_item(item, seller_id, time_point) 
+            total_items = items_data['paging']['total']
+            print "total items: %s" % total_items
+            total_pages = total_items/items_data['paging']['limit'] + 1 #FIXME: RES_LIMIT not paging limit
+            print "total pages: %s" % total_pages
+            for pn in range(total_pages):
+                offset += int(limit)
+                pages.append({'seller_id': seller_id, 'limit': limit, 'offset': offset})
+        
+        return pages
 
 
-    def collect_sellers(self, sellers_id):
+    def collect_sellers(self, seller_pages):
             while True:
-                for seller_id in sellers_id:
-                    time_point = datetime.isoformat(datetime.now()) #uniform datetime
-                    self.get_items(seller_id, time_point)
-                    rd.publish('sellers', self.format_data(seller_id))
+                time_point = datetime.isoformat(datetime.now()) #uniform datetime
+                for seller_page in seller_pages:
+                    self.get_items(seller_page, time_point)
+                    rd.publish('sellers', self.format_data(seller_page['seller_id']))
                 
 
 def main(workers):
@@ -156,7 +185,8 @@ def main(workers):
         while True:
             procs = []
             sellers_q = multiprocessing.Queue()
-            [sellers_q.put(seller) for seller in sellers]
+            pages = mc.get_pages(sellers)
+            [sellers_q.put(page) for page in pages]
             [sellers_q.put('sentinel') for i in range(workers)]
             the_pool = multiprocessing.Pool(workers, mc.sellers_collector,(sellers_q,))
             the_pool.close()
@@ -164,7 +194,8 @@ def main(workers):
             
 
     else:
-        mc.collect_sellers(['80183917'])
+        pages = mc.get_pages(['80183917'])
+        mc.collect_sellers(pages)
 
 
 
