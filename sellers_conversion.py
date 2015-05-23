@@ -118,7 +118,9 @@ class MeliCollector(): #make all into a class
             print "getting items"
             time_point = datetime.isoformat(datetime.now()) #uniform datetime
             self.get_items(seller_page, time_point)
-            rd.publish('sellers', rd.hgetall('sellers-%s' % seller_page['seller_id']))
+            print "***publishing to channel %s ***" % 'sellers:%s' % seller_page['seller_id']
+            #rd.publish('sellers:%s' % seller_page['seller_id'], rd.hgetall('sellers-%s' % seller_page['seller_id']))
+            rd.publish('sellers:%s' % seller_page['seller_id'], self.format_data(seller_page['seller_id']))
             
 
 
@@ -141,7 +143,6 @@ class MeliCollector(): #make all into a class
                     items_visits[item_visits['item_id']] = item_visits['total_visits']
                 
             for item in items:
-                print item['title']
                 today_visits = items_visits[item['id']]
                 self.insert_item(item, seller_page['seller_id'], today_visits) 
 
@@ -169,7 +170,7 @@ class MeliCollector(): #make all into a class
                 time_point = datetime.isoformat(datetime.now()) #uniform datetime
                 for seller_page in seller_pages:
                     self.get_items(seller_page, time_point)
-                    rd.publish('sellers', self.format_data(seller_page['seller_id']))
+                    rd.publish('sellers:%s' % seller_page['seller_id'], self.format_data(seller_page['seller_id']))
                 
 
 def main(workers):

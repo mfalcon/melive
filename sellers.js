@@ -1,4 +1,5 @@
-var app = require('express')();
+var express = require('express');
+var app = express();
 
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
@@ -9,7 +10,8 @@ var redisSubscriber = redis.createClient();
 var socketIORedis = require('socket.io-redis');
 io.adapter(socketIORedis({ host: 'localhost', port: 6379 }));
 
-redisSubscriber.subscribe('sellers');
+//redisSubscriber.subscribe('sellers');
+//redisSubscriber.subscribe('sellers:80183917');
 
 redisSubscriber.on('message', function(channel, message) {
   io.emit(channel, message);
@@ -22,9 +24,11 @@ app.get('/', function(req, res){
 
 
 app.get('/sellers/:seller_id', function(req, res){
-  var seller = req.param('seller_id');
-  console.log(seller);
-  res.render( 'sellers_d3js.html', { seller:seller } );
+  var seller_id = req.params.seller_id;
+  redisSubscriber.subscribe('sellers:'.concat(seller_id)); //FIXME: proper syntax
+  console.log(seller_id);
+
+  res.render( 'seller.ejs', { seller:seller_id } );
 });
 
 io.on('connection', function(socket){

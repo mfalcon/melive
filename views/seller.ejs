@@ -54,7 +54,7 @@
         var socket = io();
 
         //var data = [];
-        socket.on('sellers:80183917', function(msg){
+        socket.on('sellers:'.concat(<%= seller %>), function(msg){
           var seller = $.parseJSON(msg);
           var sales = [];
           var visits = [];
