@@ -98,7 +98,7 @@ class MeliCollector(): #make all into a class
                 'title': item['title'],
                 'today_visits': today_visits,
                 'sold_today': sold_today,
-                'conversion_rate': sold_today/float(today_visits) if sold_today else 0.0,
+                'conversion_rate': sold_today/float(today_visits) if today_visits else 0.0,
                 'prev_sold_quantity': prev_sold                
         }
         rd.hmset('sellers-%s' % seller_id, {'items-%s' % item['id']: item_data})
