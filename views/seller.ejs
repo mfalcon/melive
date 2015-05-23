@@ -36,15 +36,12 @@
   <body>
     <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
     <div>
-        <h2>meLive</h2>
         <h3>Sellers Conversion Rates</h3>
     </div>
     <table id="data">
     </table>
-    </div>
     <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
     <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
-    <script src="../js/conversion_table.js" charset="utf-8"></script>
     <script>     
         var table = d3.select('#data')
         // set up the table header
@@ -143,7 +140,7 @@
         var socket = io();
 
         //var data = [];
-        socket.on('sellers:'.concat(<%= seller %>), function(msg){
+        socket.on('sellers-'.concat(<%= seller %>), function(msg){
             var data = [];
             var seller = $.parseJSON(msg);
             var items = seller['items'];

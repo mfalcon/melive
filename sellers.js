@@ -27,7 +27,7 @@ app.get('/', function(req, res){
 
 app.get('/sellers/:seller_id', function(req, res){
   var seller_id = req.params.seller_id;
-  redisSubscriber.subscribe('sellers:'.concat(seller_id)); //FIXME: proper syntax
+  redisSubscriber.subscribe('sellers-'.concat(seller_id)); //FIXME: proper syntax
   console.log(seller_id);
 
   res.render( 'seller.ejs', { seller:seller_id } );

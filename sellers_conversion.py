@@ -21,7 +21,7 @@ import meli_api
 
 
 INITIAL_OFFSET = 0
-RES_LIMIT = 200
+RES_LIMIT = 50
 INITIAL_PAGE_LIMIT = 5
 PAGE_LIMIT = 5 #10 #total pages to scrap
 ITEMS_IDS_LIMIT = 50 #bulk items/visits get limit
@@ -29,7 +29,7 @@ ITEMS_IDS_LIMIT = 50 #bulk items/visits get limit
 
 SELLERS = {
     #'134137537': 'TEKNOKINGS',
-    #'92607234': 'DATA TOTAL',
+    '92607234': 'DATA TOTAL',
     #'5846919' : 'COMPUDATASOFT',
     '80183917' : 'GEZATEK COMPUTACION',
 }
@@ -73,36 +73,34 @@ class MeliCollector(): #make all into a class
             item_data = eval(items[item_id])
             data.append(item_data)
         
-        return json.dumps({'seller': SELLERS[seller_id], 'items': data})
+        print "total of %d items for %s" % (len(data), SELLERS[seller_id])
+        return json.dumps({'seller_name': SELLERS[seller_id], 'items': data})
         
 
 
     def insert_item(self, item, seller_id, today_visits):
         #in_redis = rd.get(item['id'])
-        in_redis = rd.hmget('sellers-%s' % seller_id, item['id'])
-        
+        in_redis = rd.hmget('sellers-%s' % seller_id, 'items-%s' % item['id'])
+
         if not in_redis[0]: #in_redis returns [None] ??
             #first time considering the item today
             prev_sold = item['sold_quantity']
             sold_today = 0
             
         else: #item already in redis, add sold_quantity diff
-            item_redis = json.loads(in_redis)
+            #item_redis = json.loads(in_redis)
+            item_redis = eval(in_redis[0])
             prev_sold = item_redis['prev_sold_quantity']
             sold_today = item['sold_quantity'] - prev_sold #updating sold_today
         
-        #meli datetime example: 2015-04-30T20:00:00.000-03:00
-        #today_visits = self.mapi.get_items_visits([item['id']], self.today, time_point)
 
         item_data = {
                 'title': item['title'],
                 'today_visits': today_visits,
                 'sold_today': sold_today,
-                'conversion_rate': float(today_visits/sold_today) if sold_today else 0.0,
+                'conversion_rate': sold_today/float(today_visits) if sold_today else 0.0,
                 'prev_sold_quantity': prev_sold                
         }
-       
-        #rd.set(item['id'], item_data)
         rd.hmset('sellers-%s' % seller_id, {'items-%s' % item['id']: item_data})
 
 
@@ -110,17 +108,16 @@ class MeliCollector(): #make all into a class
         print os.getpid(),"working"
         while True:
             seller_page = queue.get(True)
-            #print os.getpid(), "got seller: %s" % seller_page['seller_id']
+            print os.getpid()
             if seller_page == 'sentinel':
                 print "breaking"
                 break
             
-            print "getting items"
             time_point = datetime.isoformat(datetime.now()) #uniform datetime
             self.get_items(seller_page, time_point)
-            print "***publishing to channel %s ***" % 'sellers:%s' % seller_page['seller_id']
-            #rd.publish('sellers:%s' % seller_page['seller_id'], rd.hgetall('sellers-%s' % seller_page['seller_id']))
-            rd.publish('sellers:%s' % seller_page['seller_id'], self.format_data(seller_page['seller_id']))
+            if seller_page['last']: #only publish when the last page comes
+                print "***publishing to channel %s ***" % 'sellers-%s' % seller_page['seller_id']
+                rd.publish('sellers-%s' % seller_page['seller_id'], self.format_data(seller_page['seller_id']))
             
 
 
@@ -128,10 +125,8 @@ class MeliCollector(): #make all into a class
         """
         get all the items of a seller in the desired page.
         """
-        print "seller page *******"
-        print seller_page
         items_data = self.mapi.search_by_seller(seller_page['seller_id'], seller_page['limit'], seller_page['offset'])
-        items = items_data['results']       
+        items = items_data['results'] 
         if items:
             #separate into chunks and make a call to self.mapi.get_items_visits(ids_list, date_from, date_to)
             item_ids = [item['id'] for item in items]
@@ -160,7 +155,11 @@ class MeliCollector(): #make all into a class
             print "total pages: %s" % total_pages
             for pn in range(total_pages):
                 offset += int(limit)
-                pages.append({'seller_id': seller_id, 'limit': limit, 'offset': offset})
+                if pn == total_pages -1:
+                    last = True
+                else:
+                    last = False
+                pages.append({'seller_id': seller_id, 'limit': limit, 'offset': offset, 'last': last})
         
         return pages
 
@@ -170,7 +169,7 @@ class MeliCollector(): #make all into a class
                 time_point = datetime.isoformat(datetime.now()) #uniform datetime
                 for seller_page in seller_pages:
                     self.get_items(seller_page, time_point)
-                    rd.publish('sellers:%s' % seller_page['seller_id'], self.format_data(seller_page['seller_id']))
+                    rd.publish('sellers-%s' % seller_page['seller_id'], self.format_data(seller_page['seller_id']))
                 
 
 def main(workers):
@@ -179,14 +178,15 @@ def main(workers):
 
     if workers != 1:
         sellers = SELLERS.keys()
+        '''
         for seller in sellers:
             print "setting seller: %s" % seller
-            rd.set('seller:%s' % seller, json.dumps({}))
-            
+            rd.set('sellers-%s' % seller, json.dumps({}))
+        '''
         while True:
+            pages = mc.get_pages(sellers)
             procs = []
             sellers_q = multiprocessing.Queue()
-            pages = mc.get_pages(sellers)
             [sellers_q.put(page) for page in pages]
             [sellers_q.put('sentinel') for i in range(workers)]
             the_pool = multiprocessing.Pool(workers, mc.sellers_collector,(sellers_q,))
