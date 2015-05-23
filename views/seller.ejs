@@ -3,13 +3,33 @@
   <head>
     <title>meLive</title>
     <style>
-        .chart div {
-              font: 10px sans-serif;
-              background-color: steelblue;
-              text-align: right;
-              padding: 3px;
-              margin: 1px;
-              color: white;
+        table {
+            border: 1px solid;
+            width: 100%;
+        }
+        td {
+            border: 1px solid lightgray;
+            position: relative;
+            width: 100px;
+        }
+        th {
+            text-align: left;
+            width: 100px;
+        }
+        div {
+            position: absolute;
+            bottom: 0px;
+            height: 15px;
+            z-index: -1;
+        }
+        .conversion_rate div {
+            background-color: lightsalmon
+        }
+        .today_visits div {
+            background-color: lightpink;
+        }
+        .sold_today div {
+            background-color: lightblue;
         }
     </style>
   </head>
@@ -19,60 +39,120 @@
         <h2>meLive</h2>
         <h3>Sellers Conversion Rates</h3>
     </div>
-    <div class="chart">
-    <div id="items">
+    <table id="data">
+    </table>
     </div>
     <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
     <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script src="../js/conversion_table.js" charset="utf-8"></script>
     <script>     
+        var table = d3.select('#data')
+        // set up the table header
+        table.append('thead')
+            .append('tr')
+            .selectAll('th')
+                .data(['Titulo', 'Visitas', 'Ventas', 'Conversion(%)'])
+            .enter()
+                .append('th')
+                .text(function (d) { return d })
+
+        table.append('tbody')
+        
+        function setupData(data) {
+            // first, select the table and join the data to its rows
+            // just in case we have unsorted data, use the item's title
+            // as a key for mapping data on update
+            var rows = d3.select('tbody')
+                .selectAll('tr')
+                .data(data, function(d) { return d.title })
+
+            // if you do end up having variable-length data,
+            // uncomment this line to remove the old ones.
+            // rows.exit().remove()
+
+            // For new data, we create rows of <tr> containing
+            // a <td> for each item.
+            // d3.map().values() converts an object into an array of
+            // its values
+            var entertd = rows.enter()
+                .append('tr')
+                    .selectAll('td')
+                        .data(function(d) { return d3.map(d).values() })
+                    .enter()
+                        .append('td')
             
-        function drawBar(data){
+            entertd.append('div')
+            entertd.append('span')
+
+            // now that all the placeholder tr/td have been created
+            // and mapped to their data, we populate the <td> with the data.
+
+            // First, we split off the individual data for each td.
+            // d3.map().entries() returns each key: value as an object
+            // { key: "key", value: value}
+            // to get a different color for each column, we set a
+            // class using the attr() function.
+
+            // then, we add a div with a fixed height and width
+            // proportional to the relative size of the value compared
+            // to all values in the input set.
+            // This is accomplished with a linear scale (d3.scale.linear)
+            // that maps the extremes of values to the width of the td,
+            // which is 100px
+
+            // finally, we display the value.  For the title entry, the div
+            // is 0px wide
+            var td = rows.selectAll('td')
+                .data(function(d) { return d3.map(d).entries() })
+                .attr('class', function (d) { return d.key })
             
-            //data is an array of two items
-            var values = [];
-            for(key in data) {
-                if(data.hasOwnProperty(key)) {
-                    var value = data[key][1];
-                    values.push(value);
-                }
-            }
-            
-            var x = d3.scale.linear()
-            .domain([0, d3.max(values)])
-            .range([0, 420]);
-            
-            d3.select(".chart")
-              .selectAll("div")
-                .data(data)
-              .enter().append("div")
-                .style("width", function(d) { return x(d[1]) + "px"; })
-                .text(function(d) { 
-                        var legend = d[0] + "(" + d[1] + ")";
-                        return legend;
-                      });
-        };
+            // the simple addition of the transition() makes the
+            // bars update smoothly when the data changes
+            td.select('div')
+                .transition()
+                .duration(800)
+                .style('width', function(d) {
+                    switch (d.key) {
+                        case 'conversion_rate' :
+                            // percentage scale is static
+                            scale = d3.scale.linear()
+                                .domain([0, 1])
+                                .range([0, 100])
+                            break;
+                        case 'today_visits': 
+                        case 'sold_today' :
+                            scale = d3.scale.linear()
+                            .domain(d3.extent(data, function(d1) { return d1[d.key] }))
+                            .range([0, 100])
+                            break;
+                        default:
+                            return '0px'
+                    }
+                    return scale(d.value) + 'px'
+                })
+            td.select('span')
+                .text(function(d) {
+                    if (d.key == 'conversion_rate') {
+                        return Math.round(100*d.value) + '%'
+                    }
+                    return d.value
+                })
+        }
+        
+        
         var socket = io();
 
         //var data = [];
         socket.on('sellers:'.concat(<%= seller %>), function(msg){
-          var seller = $.parseJSON(msg);
-          var sales = [];
-          var visits = [];
-          var conversion = [];
-          var items = seller['items'];
-          
-          var data = [];
-          for(item in items) {
-            var item_data = items[item];
-            //data.push(item_data)
-            data.push([item_data['title'], item_data['today_visits'], item_data['sold_today'], item_data['conversion-rate']]);
-          }
-          
-          //oTable.dataTable(data);
-          
-          $(".chart").html("");
-          drawBar(data);
-          
+            var data = [];
+            var seller = $.parseJSON(msg);
+            var items = seller['items'];
+            for(item in items) {
+                var item_data = items[item];
+                data.push({'title': item_data['title'], 'today_visits': item_data['today_visits'], 'sold_today': item_data['sold_today'], 'conversion_rate': item_data['conversion_rate']});
+            }
+            setupData(data);
+            //setupData(JSON.parse(msg).items)
         });
     </script>
     

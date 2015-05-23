@@ -28,9 +28,9 @@ ITEMS_IDS_LIMIT = 50 #bulk items/visits get limit
 
 
 SELLERS = {
-    '134137537': 'TEKNOKINGS',
-    '92607234': 'DATA TOTAL',
-    '5846919' : 'COMPUDATASOFT',
+    #'134137537': 'TEKNOKINGS',
+    #'92607234': 'DATA TOTAL',
+    #'5846919' : 'COMPUDATASOFT',
     '80183917' : 'GEZATEK COMPUTACION',
 }
 
@@ -95,11 +95,11 @@ class MeliCollector(): #make all into a class
         #today_visits = self.mapi.get_items_visits([item['id']], self.today, time_point)
 
         item_data = {
-                'prev_sold_quantity': prev_sold,
-                'sold_today': sold_today,
+                'title': item['title'],
                 'today_visits': today_visits,
-                'conversion-rate': float(today_visits/sold_today) if sold_today else 0.0,
-                'title': item['title']
+                'sold_today': sold_today,
+                'conversion_rate': float(today_visits/sold_today) if sold_today else 0.0,
+                'prev_sold_quantity': prev_sold                
         }
        
         #rd.set(item['id'], item_data)
