@@ -21,16 +21,16 @@ import meli_api
 
 
 INITIAL_OFFSET = 0
-RES_LIMIT = 50
+RES_LIMIT = 200
 INITIAL_PAGE_LIMIT = 5
 PAGE_LIMIT = 5 #10 #total pages to scrap
 ITEMS_IDS_LIMIT = 50 #bulk items/visits get limit
 
 
 SELLERS = {
-    #'134137537': 'TEKNOKINGS',
+    '134137537': 'TEKNOKINGS',
     '92607234': 'DATA TOTAL',
-    #'5846919' : 'COMPUDATASOFT',
+    '5846919' : 'COMPUDATASOFT',
     '80183917' : 'GEZATEK COMPUTACION',
 }
 
@@ -81,7 +81,7 @@ class MeliCollector(): #make all into a class
     def insert_item(self, item, seller_id, today_visits):
         #in_redis = rd.get(item['id'])
         in_redis = rd.hmget('sellers-%s' % seller_id, 'items-%s' % item['id'])
-
+        import pdb; pdb_set_trace()
         if not in_redis[0]: #in_redis returns [None] ??
             #first time considering the item today
             prev_sold = item['sold_quantity']
@@ -131,7 +131,7 @@ class MeliCollector(): #make all into a class
             #separate into chunks and make a call to self.mapi.get_items_visits(ids_list, date_from, date_to)
             item_ids = [item['id'] for item in items]
             item_chunks = chunks(item_ids, ITEMS_IDS_LIMIT)
-            items_visits = {}
+            items_visits = {} #TODO: check item_visits usage
             for item_ids in item_chunks:
                 visits = self.mapi.get_items_visits(item_ids, self.today, time_point)
                 for item_visits in visits:
@@ -147,19 +147,20 @@ class MeliCollector(): #make all into a class
         to queue'''
         pages = []
         for seller_id in seller_ids:
-            offset = 0
-            items_data = self.mapi.search_by_seller(seller_id, limit, offset)
+            
+            items_data = self.mapi.search_by_seller(seller_id, limit, 0)
             total_items = items_data['paging']['total']
             print "total items: %s" % total_items
             total_pages = total_items/items_data['paging']['limit'] + 1 #FIXME: RES_LIMIT not paging limit
             print "total pages: %s" % total_pages
+            offset = 0
             for pn in range(total_pages):
-                offset += int(limit)
                 if pn == total_pages -1:
                     last = True
                 else:
                     last = False
                 pages.append({'seller_id': seller_id, 'limit': limit, 'offset': offset, 'last': last})
+                offset += int(limit)
         
         return pages
 
@@ -195,7 +196,7 @@ def main(workers):
             
 
     else:
-        pages = mc.get_pages(['80183917'])
+        pages = mc.get_pages(['5846919'])
         mc.collect_sellers(pages)
 
 
