@@ -81,7 +81,6 @@ class MeliCollector(): #make all into a class
     def insert_item(self, item, seller_id, today_visits):
         #in_redis = rd.get(item['id'])
         in_redis = rd.hmget('sellers-%s' % seller_id, 'items-%s' % item['id'])
-        import pdb; pdb_set_trace()
         if not in_redis[0]: #in_redis returns [None] ??
             #first time considering the item today
             prev_sold = item['sold_quantity']
