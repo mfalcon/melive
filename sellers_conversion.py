@@ -28,14 +28,15 @@ ITEMS_IDS_LIMIT = 50 #bulk items/visits get limit
 
 
 SELLERS = {
-    '134137537': 'TEKNOKINGS',
-    '92607234': 'DATA TOTAL',
-    '5846919' : 'COMPUDATASOFT',
+    #'134137537': 'TEKNOKINGS',
+    #'92607234': 'DATA TOTAL',
+    #'5846919' : 'COMPUDATASOFT',
     '80183917' : 'GEZATEK COMPUTACION',
+    '145020084': 'FULL_H4RD',
 }
 
 
-rd = redis.StrictRedis(host='localhost', port=6379, db=2)
+rd = redis.StrictRedis(host='localhost', port=6379) #, db=2)
 p = rd.pubsub()
 
 
@@ -181,8 +182,11 @@ def main(workers):
         '''
         for seller in sellers:
             print "setting seller: %s" % seller
-            rd.set('sellers-%s' % seller, json.dumps({}))
+            #rd.set('sellers-%s' % seller, json.dumps({}))
+            #rd.hmset('sellers-%s' % seller, {})
         '''
+        rd.flushdb()
+            
         while True:
             pages = mc.get_pages(sellers)
             procs = []

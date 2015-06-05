@@ -10,7 +10,7 @@ var redis = require('redis');
 var redisSubscriber = redis.createClient();
 
 var socketIORedis = require('socket.io-redis');
-io.adapter(socketIORedis({ host: 'localhost', port: 6379 }));
+io.adapter(socketIORedis({ host: '107.170.112.21', port: 6379}));
 
 //redisSubscriber.subscribe('sellers');
 //redisSubscriber.subscribe('sellers:80183917');
