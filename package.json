@@ -1,7 +1,7 @@
 {
-  "name": "socket-chat-example",
+  "name": "melive",
   "version": "0.0.1",
-  "description": "my first app",
+  "description": "realtime-meli",
   "dependencies": {
     "bootstrap": "^3.3.4",
     "express": "^4.10.2",
