@@ -28,32 +28,17 @@ ITEMS_IDS_LIMIT = 50 #bulk items get limit
 
 
 ALLOWED_CATEGORIES = { 
-    #celulares
-    'MLA7076': 'LG',
-    'MLA4231': 'Motorola',
-    'MLA3506': 'Nokia',
-    'MLA3519': 'Samsung',
-    'MLA3515': 'Sony',
-    'MLA32089': 'Apple-iPhone',
-    #notebooks
-    'MLA13516': 'Acer',
-    'MLA13996': 'Apple',
-    'MLA51710': 'Asus',
-    'MLA32195': 'Bangho',
-    'MLA13517': 'Dell',
-    'MLA13517': 'HP',
-    'MLA13513': 'Lenovo',
-    'MLA83596': 'Samsung',
-    'MLA13514': 'Sony Vaio',
-    'MLA13524': 'Toshiba',
-    #computacion
-    'MLA2141': 'Impresoras',
-    'MLA1712': 'Perifericos',
-    'MLA1649': 'PC',
-    'MLA1652': 'Notebooks',
-    #otros
-    'MLA1430': 'Ropa y accesorios',
-    
+    #modelos celulares
+    'MLA402291': 'iPhone 7 Plus',
+    'MLA402290': 'iPhone 7',
+    'MLA352540': 'iPhone 6',
+    'MLA391860': 'Samsung Galaxy J7',
+    'MLA389395': 'Samsung Galaxy S7',
+    'MLA389396': 'Samsung Galaxy S7 Edge',
+    'MLA399246': 'Moto G4',
+    'MLA389015': 'Sony Xperia Z5',
+    'MLA392112': 'Huawei P8',
+    'MLA393567': 'Moto E 2da Gen',
 }
 
 
