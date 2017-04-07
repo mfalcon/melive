@@ -8,11 +8,11 @@ var http = require('http').Server(app);
 
 var io = require('socket.io')(http);
 var sredis = require('socket.io-redis');
-io.adapter(sredis({ host: '107.170.112.21', port: 6379 }));
+io.adapter(sredis({ host: 'localhost', port: 6379 }));
 
 var redis = require('redis');
 
-redisSubscriber = redis.createClient(6379, '107.170.112.21', {});
+redisSubscriber = redis.createClient(6379, 'localhost', {});
 
 
 redisSubscriber.on('message', function(channel, message) {
